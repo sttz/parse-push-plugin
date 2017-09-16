@@ -78,63 +78,12 @@ void MethodSwizzle(Class c, SEL originalSelector) {
 {
    BOOL isOk = [self swizzled_application:application didFinishLaunchingWithOptions:launchOptions];
 
-   @try {
-      // test if Parse client has been initialized in the main AppDelegate.m
-      NSLog(@"Custom Parse.Push init already took place. appId: %@", [Parse getApplicationId]);
-   } @catch (NSException *exception) {
-      //
-      // default Parse Push setup. For custom setup, initialize the Parse client and
-      // notification settings yourself in your main AppDelegate.m 's didFinishLaunchingWithOptions
-      //
-      ParsePushPlugin* pluginInstance = [self getParsePluginInstance];
-
-      NSString *appId      = [pluginInstance getConfigForKey:@"ParseAppId"];
-      NSString *serverUrl  = [pluginInstance getConfigForKey:@"ParseServerUrl"];
-      NSString *clientKey  = [pluginInstance getConfigForKey:@"ParseClientKey"];
-      NSString *autoReg = [pluginInstance getConfigForKey:@"ParseAutoRegistration"];
-
-      if(!appId.length){
-         NSException* invalidSettingException = [NSException
-           exceptionWithName:@"invalidSettingException"
-           reason:@"Please set \"appId\" with a preference tag in config.xml"
-           userInfo:nil];
-         @throw invalidSettingException;
-      }
-
-      if(!serverUrl.length){
-         NSException* invalidSettingException = [NSException
-           exceptionWithName:@"invalidSettingException"
-           reason:@"Please set \"ParseServerUrl\" with a preference tag in config.xml"
-           userInfo:nil];
-         @throw invalidSettingException;
-      }
-
-      if( [@"PARSE_DOT_COM" caseInsensitiveCompare:serverUrl] == NSOrderedSame ) {
-         //
-         // initialize for use with parse.com
-         //
-         [Parse setApplicationId:appId clientKey:clientKey];
-      } else{
-         //
-         // initialize for use with opensource parse-server
-         //
-         [Parse initializeWithConfiguration:[ParseClientConfiguration configurationWithBlock:^(id<ParseMutableClientConfiguration> configuration) {
-            configuration.applicationId = appId;
-            configuration.server = serverUrl;
-            configuration.clientKey = clientKey;
-         }]];
-      }
-
-      if(!autoReg.length || [autoReg caseInsensitiveCompare:@"true"] == 0 || [application isRegisteredForRemoteNotifications]){
-          // if autoReg is true or nonexistent (defaults to true)
-          // or app already registered for PN, do/redo registration
-          //
-          // Note: redo registration because APNS device token can change and Apple
-          // suggests re-registering on each app start. registerForPN() is idempotent so
-          // no worries if it gets called multiple times.
-          [pluginInstance registerForPN];
-      }
-	}
+   // Only init Parse SDK here when server is already known
+   ParsePushPlugin* pluginInstance = [self getParsePluginInstance];
+   NSString *serverUrl  = [pluginInstance getConfigForKey:@"ParseServerUrl"];
+   if ([@"DYNAMIC" caseInsensitiveCompare:serverUrl] != NSOrderedSame) {
+       [pluginInstance initParse:nil];
+   }
 
    return isOk;
 }
@@ -148,7 +97,8 @@ void MethodSwizzle(Class c, SEL originalSelector) {
 
     //
     // Save device token
-    [ParsePushPlugin saveDeviceTokenToInstallation:newDeviceToken];
+    ParsePushPlugin* pluginInstance = [self getParsePluginInstance];
+    [pluginInstance saveDeviceTokenToInstallation:newDeviceToken];
 }
 
 - (void)swizzled_application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo

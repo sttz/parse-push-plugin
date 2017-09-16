@@ -47,6 +47,10 @@ var ParsePushPlugin = {
 
    DEBUG: false,
 
+   initParse: function(serverUrl, successCb, errorCb) {
+      cordova.exec(successCb, errorCb, serviceName, 'initParse', [ serverUrl ]);
+   },
+
    getInstallationId: function(successCb, errorCb) {
       cordova.exec(successCb, errorCb, serviceName, 'getInstallationId', []);
    },

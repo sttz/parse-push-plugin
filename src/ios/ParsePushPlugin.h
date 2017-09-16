@@ -4,12 +4,15 @@
 
 @interface ParsePushPlugin: CDVPlugin <UNUserNotificationCenterDelegate>
 
+@property bool isParseInitialized;
 @property bool hasRegistered;
 @property (copy) NSString* callbackId;
 @property (retain) NSMutableArray* pnQueue;
+@property (retain) NSData* updatedDeviceToken;
 
 //
 // methods exposed to JS as API
+- (void)initParse:(CDVInvokedUrlCommand *)command;
 - (void)register: (CDVInvokedUrlCommand *)command;
 - (void)getInstallationId: (CDVInvokedUrlCommand*)command;
 - (void)getInstallationObjectId: (CDVInvokedUrlCommand*)command;
@@ -29,5 +32,5 @@
 - (void)registerForPN;
 - (void)jsCallback: (NSDictionary*)userInfo withAction: (NSString*)pnAction;
 - (NSString *) getConfigForKey:(NSString *) key;
-+ (void)saveDeviceTokenToInstallation: (NSData*)deviceToken;
+- (void)saveDeviceTokenToInstallation: (NSData*)deviceToken;
 @end

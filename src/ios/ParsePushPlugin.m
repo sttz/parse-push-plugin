@@ -23,13 +23,133 @@
     [pluginResult setKeepCallbackAsBool:YES];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
 
-    if(self.pnQueue && self.pnQueue.count){
+    if(self.pnQueue && self.pnQueue.count && self.isParseInitialized){
         [self flushPushNotificationQueue];
     }
 }
 
+- (void)initParse:(CDVInvokedUrlCommand *)command
+{
+    if (!self.isParseInitialized) {
+        @try {
+            // test if Parse client has been initialized in the main AppDelegate.m
+            NSLog(@"Custom Parse.Push init already took place. appId: %@", [Parse getApplicationId]);
+            self.isParseInitialized = YES;
+
+        } @catch (NSException *exception) {
+            //
+            // default Parse Push setup. For custom setup, initialize the Parse client and
+            // notification settings yourself in your main AppDelegate.m 's didFinishLaunchingWithOptions
+            //
+            NSString *appId      = [self getConfigForKey:@"ParseAppId"];
+            NSString *serverUrl  = [self getConfigForKey:@"ParseServerUrl"];
+            NSString *clientKey  = [self getConfigForKey:@"ParseClientKey"];
+            NSString *autoReg = [self getConfigForKey:@"ParseAutoRegistration"];
+
+            if ([@"DYNAMIC" caseInsensitiveCompare:serverUrl] == NSOrderedSame) {
+                if (command == nil) {
+                    NSException* invalidSettingException = [NSException
+                        exceptionWithName:@"invalidCallException"
+                        reason:@"Cannot call initParse without command when ParseServerUrl is set to DYNAMIC."
+                        userInfo:nil];
+                    @throw invalidSettingException;
+                }
+                serverUrl = [command.arguments objectAtIndex:0];
+                if (serverUrl == nil || !serverUrl.length) {
+                    NSException* invalidSettingException = [NSException
+                        exceptionWithName:@"invalidSettingException"
+                        reason:@"ParseServerUrl set to DYNAMIC but no url recevied from JS."
+                        userInfo:nil];
+                    @throw invalidSettingException;
+                }
+            } else if (command != nil) {
+                NSException* invalidSettingException = [NSException
+                    exceptionWithName:@"invalidSettingException"
+                    reason:@"Cannot call initParse when ParseServerUrl is not set to DYNAMIC."
+                    userInfo:nil];
+                @throw invalidSettingException;
+            }
+
+            if(!appId.length){
+                NSException* invalidSettingException = [NSException
+                    exceptionWithName:@"invalidSettingException"
+                    reason:@"Please set \"appId\" with a preference tag in config.xml"
+                    userInfo:nil];
+                @throw invalidSettingException;
+            }
+
+            if(!serverUrl.length){
+                NSException* invalidSettingException = [NSException
+                    exceptionWithName:@"invalidSettingException"
+                    reason:@"Please set \"ParseServerUrl\" with a preference tag in config.xml"
+                    userInfo:nil];
+                @throw invalidSettingException;
+            }
+
+            if( [@"PARSE_DOT_COM" caseInsensitiveCompare:serverUrl] == NSOrderedSame ) {
+                //
+                // initialize for use with parse.com
+                //
+                NSLog(@"ParsePushPlugin: Initializing SDK for Parse.com");
+                [Parse setApplicationId:appId clientKey:clientKey];
+            } else{
+                //
+                // initialize for use with opensource parse-server
+                //
+                NSLog(@"ParsePushPlugin: Initializing SDK with server '%@'", serverUrl);
+                [Parse initializeWithConfiguration:[ParseClientConfiguration configurationWithBlock:^(id<ParseMutableClientConfiguration> configuration) {
+                    configuration.applicationId = appId;
+                    configuration.server = serverUrl;
+                    configuration.clientKey = clientKey;
+                }]];
+            }
+
+            UIApplication *application = [UIApplication sharedApplication];
+            if(!autoReg.length || [autoReg caseInsensitiveCompare:@"true"] == 0 || [application isRegisteredForRemoteNotifications]){
+                // if autoReg is true or nonexistent (defaults to true)
+                // or app already registered for PN, do/redo registration
+                //
+                // Note: redo registration because APNS device token can change and Apple
+                // suggests re-registering on each app start. registerForPN() is idempotent so
+                // no worries if it gets called multiple times.
+                [self registerForPN];
+            }
+
+            self.isParseInitialized = YES;
+
+            if (self.updatedDeviceToken != nil) {
+                [self saveDeviceTokenToInstallation:self.updatedDeviceToken];
+                self.updatedDeviceToken = nil;
+            }
+
+            if (self.pnQueue && self.pnQueue.count && self.callbackId) {
+                [self flushPushNotificationQueue];
+            }
+        }
+    }
+
+    if (command != nil) {
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }
+}
+
+- (BOOL)ensureParseInitialized:(CDVInvokedUrlCommand *)command
+{
+    if (!self.isParseInitialized) {
+        CDVPluginResult* pluginResult = [CDVPluginResult 
+            resultWithStatus:CDVCommandStatus_ERROR 
+            messageAsString:@"Parse SDK not yet initialized."];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        return NO;
+    }
+    return YES;
+}
+
 - (void)register:(CDVInvokedUrlCommand *)command
 {
+    if (![self ensureParseInitialized:command]) return;
+
     [self registerForPN];
 
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
@@ -38,6 +158,8 @@
 
 - (void)getInstallationId:(CDVInvokedUrlCommand*) command
 {
+    if (![self ensureParseInitialized:command]) return;
+
     [self.commandDelegate runInBackground:^{
         CDVPluginResult* pluginResult = nil;
         PFInstallation *currentInstallation = [PFInstallation currentInstallation];
@@ -49,6 +171,8 @@
 
 - (void)getInstallationObjectId:(CDVInvokedUrlCommand*) command
 {
+    if (![self ensureParseInitialized:command]) return;
+
     [self.commandDelegate runInBackground:^{
         CDVPluginResult* pluginResult = nil;
         PFInstallation *currentInstallation = [PFInstallation currentInstallation];
@@ -60,6 +184,8 @@
 
 - (void)getSubscriptions: (CDVInvokedUrlCommand *)command
 {
+    if (![self ensureParseInitialized:command]) return;
+
     NSArray *channels = [PFInstallation currentInstallation].channels;
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:channels];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
@@ -67,6 +193,8 @@
 
 - (void)subscribe: (CDVInvokedUrlCommand *)command
 {
+    if (![self ensureParseInitialized:command]) return;
+
     CDVPluginResult* pluginResult = nil;
     PFInstallation *currentInstallation = [PFInstallation currentInstallation];
     NSString *channel = [command.arguments objectAtIndex:0];
@@ -78,6 +206,8 @@
 
 - (void)unsubscribe: (CDVInvokedUrlCommand *)command
 {
+    if (![self ensureParseInitialized:command]) return;
+
     CDVPluginResult* pluginResult = nil;
     PFInstallation *currentInstallation = [PFInstallation currentInstallation];
     NSString *channel = [command.arguments objectAtIndex:0];
@@ -88,13 +218,15 @@
 }
 
 - (void)resetBadge:(CDVInvokedUrlCommand *)command {
-     CDVPluginResult* pluginResult = nil;
-     PFInstallation *currentInstallation = [PFInstallation currentInstallation];
-     currentInstallation.badge = 0;
+    if (![self ensureParseInitialized:command]) return;
 
-     [currentInstallation saveInBackground];
-     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    CDVPluginResult* pluginResult = nil;
+    PFInstallation *currentInstallation = [PFInstallation currentInstallation];
+    currentInstallation.badge = 0;
+
+    [currentInstallation saveInBackground];
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 
@@ -179,11 +311,15 @@
    return [self.commandDelegate.settings objectForKey:[key lowercaseString]];
 }
 
-+ (void)saveDeviceTokenToInstallation: (NSData*)deviceToken
+- (void)saveDeviceTokenToInstallation: (NSData*)deviceToken
 {
-   PFInstallation *currentInstallation = [PFInstallation currentInstallation];
-   [currentInstallation setDeviceTokenFromData:deviceToken];
-   [currentInstallation saveInBackground];
+    if (self.isParseInitialized) {
+        PFInstallation *currentInstallation = [PFInstallation currentInstallation];
+        [currentInstallation setDeviceTokenFromData:deviceToken];
+        [currentInstallation saveInBackground];
+    } else {
+        self.updatedDeviceToken = deviceToken;
+    }
 }
 
 -(void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
