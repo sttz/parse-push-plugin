@@ -93,7 +93,7 @@ void MethodSwizzle(Class c, SEL originalSelector) {
       NSString *clientKey  = [pluginInstance getConfigForKey:@"ParseClientKey"];
       NSString *autoReg = [pluginInstance getConfigForKey:@"ParseAutoRegistration"];
 
-      NSString *serverUrlOverride = [[UserDefaults standard] stringForKey:@"ParseServerUrlOverride"];
+      NSString *serverUrlOverride = [[NSUserDefaults standardUserDefaults] stringForKey:@"ParseServerUrlOverride"];
       if (serverUrlOverride != nil) {
           NSLog(@"Overriding default server URL with: %@", serverUrlOverride);
           serverUrl = serverUrlOverride;

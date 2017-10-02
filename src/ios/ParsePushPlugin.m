@@ -32,9 +32,9 @@
 {
     NSString *url = [command.arguments objectAtIndex:0];
     if (url != nil && url.length > 0) {
-        [[UserDefaults standard] setObject:url forKey:@"ParseServerUrlOverride"];
+        [[NSUserDefaults standardUserDefaults] setObject:url forKey:@"ParseServerUrlOverride"];
     } else {
-        [[UserDefaults standard] removeObjectForKey:@"ParseServerUrlOverride"];
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"ParseServerUrlOverride"];
     }
     
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
