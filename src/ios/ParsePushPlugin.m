@@ -28,6 +28,19 @@
     }
 }
 
+- (void)overrideServerUrl: (CDVInvokedUrlCommand *)command
+{
+    NSString *url = [command.arguments objectAtIndex:0];
+    if (url != nil && url.length > 0) {
+        [[UserDefaults standard] setObject:url forKey:@"ParseServerUrlOverride"];
+    } else {
+        [[UserDefaults standard] removeObjectForKey:@"ParseServerUrlOverride"];
+    }
+    
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
 - (void)register:(CDVInvokedUrlCommand *)command
 {
     [self registerForPN];

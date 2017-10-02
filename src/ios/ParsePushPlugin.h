@@ -10,6 +10,7 @@
 
 //
 // methods exposed to JS as API
+- (void)overrideServerUrl: (CDVInvokedUrlCommand *)command;
 - (void)register: (CDVInvokedUrlCommand *)command;
 - (void)getInstallationId: (CDVInvokedUrlCommand*)command;
 - (void)getInstallationObjectId: (CDVInvokedUrlCommand*)command;

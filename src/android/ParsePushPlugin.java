@@ -6,6 +6,9 @@ import java.util.Queue;
 import java.util.LinkedList;
 import java.lang.Exception;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CordovaWebView;
@@ -21,6 +24,7 @@ import com.parse.ParseInstallation;
 import android.util.Log;
 
 public class ParsePushPlugin extends CordovaPlugin {
+  private static final String ACTION_OVERRIDE_SERVER_URL = "overrideServerUrl";
   private static final String ACTION_GET_INSTALLATION_ID = "getInstallationId";
   private static final String ACTION_GET_INSTALLATION_OBJECT_ID = "getInstallationObjectId";
   private static final String ACTION_GET_SUBSCRIPTIONS = "getSubscriptions";
@@ -47,6 +51,11 @@ public class ParsePushPlugin extends CordovaPlugin {
       if (!pnQueue.isEmpty()) {
         flushPNQueue();
       }
+      return true;
+    }
+
+    if (action.equals(ACTION_OVERRIDE_SERVER_URL)) {
+      this.overrideServerUrl(args.getString(0), callbackContext);
       return true;
     }
 
@@ -80,6 +89,19 @@ public class ParsePushPlugin extends CordovaPlugin {
       return true;
     }
     return false;
+  }
+
+  private void overrideServerUrl(final String url, final CallbackContext callbackContext) {
+    Context context = this.cordova.getActivity().getApplicationContext();
+    SharedPreferences prefs = context.getSharedPreferences("Parse", Context.MODE_PRIVATE);
+    SharedPreferences.Editor editor = prefs.edit();
+    if (url != null && url.length() > 0) {
+      editor.putString("ParseServerUrlOverride", url);
+    } else {
+      editor.remove("ParseServerUrlOverride");
+    }
+    editor.apply();
+    callbackContext.success();
   }
 
   private void getInstallationId(final CallbackContext callbackContext) {

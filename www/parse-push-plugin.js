@@ -47,6 +47,10 @@ var ParsePushPlugin = {
 
    DEBUG: false,
 
+   overrideServerUrl: function(url, successCb, errorCb) {
+      cordova.exec(successCb, errorCb, serviceName, 'overrideServerUrl', [ url ]);
+   },
+
    getInstallationId: function(successCb, errorCb) {
       cordova.exec(successCb, errorCb, serviceName, 'getInstallationId', []);
    },
